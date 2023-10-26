@@ -1,20 +1,32 @@
 ﻿using Sportradar.DataProviders.Interfaces;
 using Sportradar.Football.Domain;
+using System.Collections.Concurrent;
 
 namespace Sportradar.DataProviders
 {
     public class FootballDataProvider : IFootballDataProvider
     {
-        private readonly object syncRoot = new object();
-        private List<FootballMatch> matches;
+        private BlockingCollection<FootballMatch> matches;
 
-        public FootballDataProvider() {
-            matches = new List<FootballMatch>();
+        public FootballDataProvider()
+        {
+            matches = new BlockingCollection<FootballMatch>();
         }
 
-        public IEnumerable<FootballMatch> Matches()
+        public IEnumerable<FootballMatch> Matches(bool isAsc)
         {
-            return matches;
+            if (isAsc)
+            {
+                return matches
+                    .OrderBy(m => m.TotalGoals)
+                    .ThenBy(m => m.MatchDateTime);
+            }
+            else
+            {
+                return matches
+                .OrderByDescending(m => m.TotalGoals)
+                .ThenByDescending(m => m.MatchDateTime);
+            }
         }
 
         public void StartMatch(FootballTeam homeTeam, FootballTeam awayTeam)
@@ -24,11 +36,7 @@ namespace Sportradar.DataProviders
             if (awayTeam == null)
                 throw new ArgumentNullException(nameof(awayTeam));
 
-            lock (syncRoot)
-            {
-                AddMatch(homeTeam, awayTeam);
-                ReorderMatches();
-            }
+            AddMatch(homeTeam, awayTeam);
         }
 
         public void UpdateMatch(FootballTeam homeTeam, FootballTeam awayTeam, int homeTeamScore, int awayTeamScore)
@@ -42,16 +50,13 @@ namespace Sportradar.DataProviders
             if (awayTeamScore < 0)
                 throw new ArgumentOutOfRangeException(nameof(awayTeamScore));
 
-            lock (syncRoot)
-            {
-                var match = GetMatch(homeTeam, awayTeam);
+            var match = RemoveMatch(homeTeam, awayTeam);
 
-                if (match == null)
-                    throw new InvalidOperationException("Match not found.");
+            if (match == null)
+                throw new InvalidOperationException("Match not found.");
 
-                match.UpdateScore(homeTeamScore, awayTeamScore);
-                ReorderMatches();
-            }
+            match.UpdateScore(homeTeamScore, awayTeamScore);
+            AddMatch(match);
         }
 
         public void FinishMatch(FootballTeam homeTeam, FootballTeam awayTeam)
@@ -61,15 +66,7 @@ namespace Sportradar.DataProviders
             if (awayTeam == null)
                 throw new ArgumentNullException(nameof(awayTeam));
 
-            lock (syncRoot)
-            {
-                var match = GetMatch(homeTeam, awayTeam);
-
-                if (match == null)
-                    throw new InvalidOperationException("Match not found.");
-
-                matches.Remove(match);
-            }
+            RemoveMatch(homeTeam, awayTeam);
         }
 
         private void AddMatch(FootballTeam homeTeam, FootballTeam awayTeam)
@@ -79,24 +76,32 @@ namespace Sportradar.DataProviders
             if (matchExists != null)
                 throw new InvalidOperationException("Match already exists.");
 
-            var match = new FootballMatch(homeTeam, awayTeam, DateTime.UtcNow);
+            AddMatch(new FootballMatch(homeTeam, awayTeam, DateTime.UtcNow));
+        }
+
+        private void AddMatch(FootballMatch match)
+        {
+            if (match == null)
+                throw new ArgumentNullException(nameof(match));
+
             matches.Add(match);
+        }
+
+        private FootballMatch? RemoveMatch(FootballTeam homeTeam, FootballTeam awayTeam)
+        {
+            FootballMatch? match = GetMatch(homeTeam, awayTeam);
+
+            if (match == null)
+                throw new InvalidOperationException("Match not found.");
+
+            matches.TryTake(out match);
+
+            return match;
         }
 
         private FootballMatch? GetMatch(FootballTeam homeTeam, FootballTeam awayTeam)
         {
             return matches.FirstOrDefault(m => m.HomeTeam.TeamName == homeTeam.TeamName && m.AwayTeam.TeamName == awayTeam.TeamName);
-        }
-
-        private void ReorderMatches()
-        {
-            if (!matches.Any())
-                return;
-
-            matches = matches
-                .OrderByDescending(m => m.TotalGoals)
-                .ThenByDescending(m => m.MatchDateTime)
-                .ToList();
         }
     }
 }

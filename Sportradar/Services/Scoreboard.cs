@@ -12,17 +12,17 @@ namespace Sportradar.Services
             this.dataProvider = dataProvider ?? throw new ArgumentNullException(nameof(dataProvider));
         }
 
-        public void StartNewMatch(FootballTeam homeTeam, FootballTeam awayTeam)
+        public async void StartNewMatch(FootballTeam homeTeam, FootballTeam awayTeam)
         {
             if (homeTeam == null)
                 throw new ArgumentNullException(nameof(homeTeam));
             if (awayTeam == null)
                 throw new ArgumentNullException(nameof(awayTeam));
 
-            dataProvider.StartMatch(homeTeam, awayTeam);
+            await Task.Run(() => dataProvider.StartMatch(homeTeam, awayTeam));
         }
 
-        public void UpdateScore(FootballTeam homeTeam, FootballTeam awayTeam, int homeTeamScore, int awayTeamScore)
+        public async void UpdateScore(FootballTeam homeTeam, FootballTeam awayTeam, int homeTeamScore, int awayTeamScore)
         {
             if (homeTeam == null)
                 throw new ArgumentNullException(nameof(homeTeam));
@@ -33,22 +33,22 @@ namespace Sportradar.Services
             if (awayTeamScore < 0)
                 throw new ArgumentOutOfRangeException(nameof(awayTeamScore));
 
-            dataProvider.UpdateMatch(homeTeam, awayTeam, homeTeamScore, awayTeamScore);
+            await Task.Run(() => dataProvider.UpdateMatch(homeTeam, awayTeam, homeTeamScore, awayTeamScore));
         }
 
-        public void FinishMatch(FootballTeam homeTeam, FootballTeam awayTeam)
+        public async void FinishMatch(FootballTeam homeTeam, FootballTeam awayTeam)
         {
             if (homeTeam == null)
                 throw new ArgumentNullException(nameof(homeTeam));
             if (awayTeam == null)
                 throw new ArgumentNullException(nameof(awayTeam));
 
-            dataProvider.FinishMatch(homeTeam, awayTeam);
+            await Task.Run(() => dataProvider.FinishMatch(homeTeam, awayTeam));
         }
 
-        public async Task<IEnumerable<FootballMatch>> GetMatches()
+        public async Task<IEnumerable<FootballMatch>> GetMatches(bool isAsc = false)
         {
-            return await Task.Run(() => dataProvider.Matches());
+            return await Task.Run(() => dataProvider.Matches(isAsc));
         }
     }
 }

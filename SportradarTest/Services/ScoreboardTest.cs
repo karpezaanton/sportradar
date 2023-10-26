@@ -30,7 +30,7 @@ namespace Sportradar.Tests
                 new FootballMatch(new FootballTeam("HomeTeam1"), new FootballTeam("AwayTeam1"), DateTime.Now),
                 new FootballMatch(new FootballTeam("HomeTeam2"), new FootballTeam("AwayTeam2"), DateTime.Now),
             };
-            dataProviderMock.Setup(dp => dp.Matches()).Returns(expectedMatches);
+            dataProviderMock.Setup(dp => dp.Matches(false)).Returns(expectedMatches);
 
             // Act
             var matches = await scoreboard.GetMatches();
